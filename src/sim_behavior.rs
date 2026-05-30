@@ -1,29 +1,24 @@
+use crate::sim_data::SimData;
 
-
-use crate::sim_data::{SimData};
-
-pub trait SimBehavior<E>{
-  fn step(&mut self, data: &mut SimData<E>);
+pub trait SimBehavior<T: Default + Copy + Into<u32>, E: Default> {
+    fn step(&mut self, data: &mut SimData<T, E>);
 }
 
-
-pub struct Simulation<B: SimBehavior<E>, E> {
-  pub data: SimData<E>,
-  pub behavior: B,
+pub struct Simulation<T: Default + Copy + Into<u32>, E: Default, B: SimBehavior<T, E>> {
+    pub data: SimData<T, E>,
+    pub behavior: B,
 }
 
-impl<B: SimBehavior<E>, E> Simulation<B, E>{
-  pub fn new(behavior: B, data: SimData<E>) -> Self{
-    Self{behavior, data}
-  }
+impl<T: Default + Copy + Into<u32>, E: Default, B: SimBehavior<T, E>> Simulation<T, E, B> {
+    pub fn new(behavior: B, data: SimData<T, E>) -> Self {
+        Self { behavior, data }
+    }
 
-  pub fn step(&mut self){
-    self.behavior.step(&mut self.data);
-  }
+    pub fn step(&mut self) {
+        self.behavior.step(&mut self.data);
+    }
 
-  pub fn output(&self) -> &Vec<u32>{
-    self.data.output()
-  }
-
-  
+    pub fn output(&self) -> Vec<u32> {
+        self.data.output()
+    }
 }

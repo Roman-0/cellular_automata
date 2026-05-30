@@ -1,17 +1,25 @@
 use std::mem;
 
-pub struct SimData <E = ()>{
- pub width: usize,
- pub height: usize,
- pub grid: Vec<u32>,
- pub next_grid: Vec<u32>,
+pub struct SimData<T, E = ()>
+where
+    T: Into<u32> + Default + Copy,
+    E: Default,
+{
+    pub width: usize,
+    pub height: usize,
+    pub grid: Vec<T>,
+    pub next_grid: Vec<T>,
 
- pub extra: E,
+    pub extra: E,
 }
 
-impl<E> SimData<E> {
-    pub fn output(&self) -> &Vec<u32> {
-        &self.grid
+impl<T, E> SimData<T, E>
+where
+    T: Into<u32> + Default + Copy,
+    E: Default,
+{
+    pub fn output(&self) -> Vec<u32> {
+        self.grid.iter().map(|x| (*x).into()).collect()
     }
 
     pub fn width(&self) -> usize {
@@ -22,9 +30,9 @@ impl<E> SimData<E> {
         self.height as usize
     }
 
-    pub fn get_cell(&self, x: usize, y: usize) -> u32 {
+    pub fn get_cell(&self, x: usize, y: usize) -> T {
         if x >= self.width() || y >= self.height() {
-            return 0;
+            return T::default();
         }
         self.grid[y * self.width() + x]
     }
@@ -37,49 +45,155 @@ impl<E> SimData<E> {
         self.grid.copy_from_slice(&self.next_grid);
     }
 
-    pub fn set_grid(&mut self, new_grid: &[u32]) {
+    pub fn set_grid(&mut self, new_grid: &[T]) {
         if new_grid.len() != self.width() * self.height() {
             panic!("New grid size does not match SimData dimensions");
         }
         self.grid.copy_from_slice(new_grid);
     }
 
-    pub fn set_next_grid(&mut self, new_grid: &[u32]) {
+    pub fn set_next_grid(&mut self, new_grid: &[T]) {
         if new_grid.len() != self.width() * self.height() {
             panic!("New grid size does not match SimData dimensions");
         }
         self.next_grid.copy_from_slice(new_grid);
     }
 
-    pub fn set_grids(&mut self, new_grid: &[u32]) {
-        if new_grid.len() != self.width() * self.height(){
+    pub fn set_grids(&mut self, new_grid: &[T]) {
+        if new_grid.len() != self.width() * self.height() {
             panic!("New grid size does not match SimData dimensions");
         }
         self.grid.copy_from_slice(new_grid);
         self.next_grid.copy_from_slice(new_grid);
+    }
+
+    pub fn get_neighbors_4<F>(&self, idx: usize, looping: bool, mut f: F)
+    where
+        F: FnMut(T),
+    {
+        if idx >= self.width * self.height {
+            panic!("Index too large (Get_Neighbors_4)");
+        }
+        let x = idx % self.width;
+        let y = idx / self.width;
+
+        if x != 0 {
+            f(self.grid[idx - 1]);
+        }
+        if x != self.width - 1 {
+            f(self.grid[idx + 1]);
+        }
+        if y != 0 {
+            f(self.grid[idx - self.width]);
+        }
+        if y != self.height - 1 {
+            f(self.grid[idx + self.width]);
+        }
+
+        if looping {
+            if x == 0 {
+                f(self.grid[idx + self.width - 1]);
+            }
+            if x == self.width - 1 {
+                f(self.grid[idx - self.width - 1]);
+            }
+            if y == 0 {
+                f(self.grid[idx + self.width * (self.height - 1)]);
+            }
+            if y == self.height - 1 {
+                f(self.grid[idx % self.width]);
+            }
+        }
+    }
+
+    pub fn get_neighbors_8<F>(&self, idx: usize, looping: bool, mut f: F)
+    where
+        F: FnMut(T),
+    {
+        if idx >= self.width * self.height {
+            panic!("Index too large (Get_Neighbors_8)");
+        }
+        let x = idx % self.width;
+        let y = idx / self.width;
+
+        let y0 = y == 0;
+        let yh = y == self.height - 1;
+
+        if x != 0 {
+            f(self.grid[idx - 1]);
+            if !y0 {
+                f(self.grid[idx - self.width - 1]);
+            }
+            if !yh {
+                f(self.grid[idx + self.width - 1]);
+            }
+        }
+        if x != self.width - 1 {
+            f(self.grid[idx + 1]);
+            if !y0 {
+                f(self.grid[idx - self.width + 1]);
+            }
+            if !yh {
+                f(self.grid[idx + self.width + 1]);
+            }
+        }
+        if !y0 {
+            f(self.grid[idx - self.width]);
+        }
+        if !yh {
+            f(self.grid[idx + self.width]);
+        }
+
+        if looping {
+            if x == 0 {
+                //left
+                f(self.grid[idx + self.width - 1]);
+                if y0 {
+                    f(self.grid[self.width * self.height - 1]);
+                } //top left
+                if yh {
+                    f(self.grid[self.width - 1]);
+                } //bottom left
+            }
+            if x == self.width - 1 {
+                //right
+                f(self.grid[idx - self.width - 1]);
+                if y0 {
+                    f(self.grid[self.width * self.height - self.width]);
+                } //top right
+                if yh {
+                    f(self.grid[self.width - 1]);
+                } //top right
+            }
+            if y0 {
+                //top
+                f(self.grid[idx + self.width * (self.height - 1)]);
+            }
+            if yh {
+                //bottom
+                f(self.grid[idx % self.width]);
+            }
+        }
     }
 }
 
-
-
-
-impl<E: Default> SimData<E> {
+impl<T: Into<u32> + Default + Copy, E: Default> SimData<T, E> {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             width: width,
             height: height,
-            grid: vec![0x00_00_00_00; width * height],
-            next_grid: vec![0x00_00_00_00; width * height],
+            grid: vec![T::default(); width * height],
+            next_grid: vec![T::default(); width * height],
 
             extra: E::default(),
         }
     }
-  pub fn new_with_extra(width: usize, height: usize, extra: E) -> Self {
+    pub fn new_with_extra(width: usize, height: usize, extra: E) -> Self {
         Self {
             width: width,
             height: height,
-            grid: vec![0x00_00_00_00; width * height],
-            next_grid: vec![0x00_00_00_00; width * height],
+            grid: vec![T::default(); width * height],
+            next_grid: vec![T::default(); width * height],
 
             extra,
         }
