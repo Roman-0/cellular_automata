@@ -1,3 +1,4 @@
+use std::mem;
 
 pub struct SimData <E = ()>{
  pub width: usize,
@@ -27,7 +28,40 @@ impl<E> SimData<E> {
         }
         self.grid[y * self.width() + x]
     }
+
+    pub fn swap_grids(&mut self) {
+        std::mem::swap(&mut self.grid, &mut self.next_grid);
+    }
+
+    pub fn update_grid(&mut self) {
+        self.grid.copy_from_slice(&self.next_grid);
+    }
+
+    pub fn set_grid(&mut self, new_grid: &[u32]) {
+        if new_grid.len() != self.width() * self.height() {
+            panic!("New grid size does not match SimData dimensions");
+        }
+        self.grid.copy_from_slice(new_grid);
+    }
+
+    pub fn set_next_grid(&mut self, new_grid: &[u32]) {
+        if new_grid.len() != self.width() * self.height() {
+            panic!("New grid size does not match SimData dimensions");
+        }
+        self.next_grid.copy_from_slice(new_grid);
+    }
+
+    pub fn set_grids(&mut self, new_grid: &[u32]) {
+        if new_grid.len() != self.width() * self.height(){
+            panic!("New grid size does not match SimData dimensions");
+        }
+        self.grid.copy_from_slice(new_grid);
+        self.next_grid.copy_from_slice(new_grid);
+    }
 }
+
+
+
 
 impl<E: Default> SimData<E> {
     pub fn new(width: usize, height: usize) -> Self {
@@ -50,29 +84,4 @@ impl<E: Default> SimData<E> {
             extra,
         }
     }
-}
-
-
-pub trait SimBehavior<E>{
-  fn step(&mut self, data: &mut SimData<E>);
-}
-
-
-pub struct Simulation<B: SimBehavior<E>, E> {
-  pub data: SimData<E>,
-  pub behavior: B,
-}
-
-impl<B: SimBehavior<E>, E> Simulation<B, E>{
-  pub fn new(behavior: B, data: SimData<E>) -> Self{
-    Self{behavior, data}
-  }
-
-  pub fn step(&mut self){
-    self.behavior.step(&mut self.data);
-  }
-
-  pub fn output(&self) -> &Vec<u32>{
-    self.data.output()
-  }
 }

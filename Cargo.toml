@@ -4,5 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+mem = "0.5.0"
 minifb = "0.28.0"
 pixels = "0.17.1"
+rand = "0.10.1"

@@ -1,27 +1,36 @@
 use minifb::{Window, WindowOptions};
-use std::time::{Duration, Instant};
-mod sim;
+
+mod sim_data;
+mod sim_behavior;
+mod sim_helper;
 mod simulations;
 
-use crate::sim::{Simulation, SimData};
+use crate::sim_data::{SimData};
+use crate::sim_behavior::{Simulation};
 use crate::simulations::base_example::*;
+use crate::sim_helper::*;
+const WIDTH: usize = 640;
+const HEIGHT: usize = 480;
 
-const WIDTH: usize = 320;
-const HEIGHT: usize = 240;
-
-const TARGET_FPS: usize = 60;
+const TARGET_FPS: usize = 200;
 
 fn main() {
-    // 1. Create a simple window
     let mut window = Window::new(
         "Simple Blue Box",
         WIDTH,
         HEIGHT,
-        WindowOptions::default(),
+
+        WindowOptions{
+                resize: true,
+                scale: minifb::Scale::X2,
+                scale_mode: minifb::ScaleMode::AspectRatioStretch,
+                ..WindowOptions::default()
+        },
     ).unwrap();
 
     let behavior = BehaviorBase;
     let mut data = SimData::new(WIDTH, HEIGHT);
+    data.set_grids(&init_random_color(WIDTH, HEIGHT));
     let mut simulation = Simulation::new(behavior, data);
 
 
