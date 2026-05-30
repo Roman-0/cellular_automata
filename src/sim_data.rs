@@ -1,25 +1,23 @@
 use std::mem;
 
-pub struct SimData<T, E = ()>
+pub struct SimData<E = ()>
 where
-    T: Into<u32> + Default + Copy,
     E: Default,
 {
     pub width: usize,
     pub height: usize,
-    pub grid: Vec<T>,
-    pub next_grid: Vec<T>,
+    pub grid: Vec<u32>,
+    pub next_grid: Vec<u32>,
 
     pub extra: E,
 }
 
-impl<T, E> SimData<T, E>
+impl<E> SimData<E>
 where
-    T: Into<u32> + Default + Copy,
     E: Default,
 {
-    pub fn output(&self) -> Vec<u32> {
-        self.grid.iter().map(|x| (*x).into()).collect()
+    pub fn output(&self) -> &Vec<u32> {
+        &self.grid
     }
 
     pub fn width(&self) -> usize {
@@ -30,9 +28,9 @@ where
         self.height as usize
     }
 
-    pub fn get_cell(&self, x: usize, y: usize) -> T {
+    pub fn get_cell(&self, x: usize, y: usize) -> u32 {
         if x >= self.width() || y >= self.height() {
-            return T::default();
+            return u32::default();
         }
         self.grid[y * self.width() + x]
     }
@@ -45,145 +43,107 @@ where
         self.grid.copy_from_slice(&self.next_grid);
     }
 
-    pub fn set_grid(&mut self, new_grid: &[T]) {
+    pub fn set_grid(&mut self, new_grid: &[u32]) {
         if new_grid.len() != self.width() * self.height() {
             panic!("New grid size does not match SimData dimensions");
         }
         self.grid.copy_from_slice(new_grid);
     }
 
-    pub fn set_next_grid(&mut self, new_grid: &[T]) {
+    pub fn set_next_grid(&mut self, new_grid: &[u32]) {
         if new_grid.len() != self.width() * self.height() {
             panic!("New grid size does not match SimData dimensions");
         }
         self.next_grid.copy_from_slice(new_grid);
     }
 
-    pub fn set_grids(&mut self, new_grid: &[T]) {
+    pub fn set_grids(&mut self, new_grid: &[u32]) {
         if new_grid.len() != self.width() * self.height() {
             panic!("New grid size does not match SimData dimensions");
         }
         self.grid.copy_from_slice(new_grid);
         self.next_grid.copy_from_slice(new_grid);
     }
+}
 
-    pub fn get_neighbors_4<F>(&self, idx: usize, looping: bool, mut f: F)
+    impl<E : Default> SimData<E> {
+    pub fn for_each_neighbor_4<F>(&self, idx: usize, looping: bool, mut f: F)
     where
-        F: FnMut(T),
+        F: FnMut(u32),
     {
         if idx >= self.width * self.height {
-            panic!("Index too large (Get_Neighbors_4)");
+            panic!("Index too large (for_each_neighbor_4)");
         }
-        let x = idx % self.width;
-        let y = idx / self.width;
+        let w = self.width;
+        let h = self.height;
+        let x = idx % w;
+        let y = idx / w;
 
-        if x != 0 {
-            f(self.grid[idx - 1]);
-        }
-        if x != self.width - 1 {
-            f(self.grid[idx + 1]);
-        }
-        if y != 0 {
-            f(self.grid[idx - self.width]);
-        }
-        if y != self.height - 1 {
-            f(self.grid[idx + self.width]);
-        }
+        // Relative steps for: Left, Right, Up, Down
+        let offsets = [(-1, 0), (1, 0), (0, -1), (0, 1)];
 
-        if looping {
-            if x == 0 {
-                f(self.grid[idx + self.width - 1]);
-            }
-            if x == self.width - 1 {
-                f(self.grid[idx - self.width - 1]);
-            }
-            if y == 0 {
-                f(self.grid[idx + self.width * (self.height - 1)]);
-            }
-            if y == self.height - 1 {
-                f(self.grid[idx % self.width]);
+        for (dx, dy) in offsets {
+            let nx = x as isize + dx;
+            let ny = y as isize + dy;
+
+            if looping {
+                // Modulo wrap around logic for Toroidal grids
+                let tx = ((nx % w as isize + w as isize) % w as isize) as usize;
+                let ty = ((ny % h as isize + h as isize) % h as isize) as usize;
+                f(self.grid[ty * w + tx]);
+            } else {
+                // Standard clamping boundary (ignore offscreen elements)
+                if nx >= 0 && nx < w as isize && ny >= 0 && ny < h as isize {
+                    f(self.grid[ny as usize * w + nx as usize]);
+                }
             }
         }
     }
 
-    pub fn get_neighbors_8<F>(&self, idx: usize, looping: bool, mut f: F)
+    pub fn for_each_neighbor_8<F>(&self, idx: usize, looping: bool, mut f: F)
     where
-        F: FnMut(T),
+        F: FnMut(u32),
     {
         if idx >= self.width * self.height {
-            panic!("Index too large (Get_Neighbors_8)");
+            panic!("Index too large (for_each_neighbor_8)");
         }
-        let x = idx % self.width;
-        let y = idx / self.width;
+        let w = self.width;
+        let h = self.height;
+        let x = idx % w;
+        let y = idx / w;
 
-        let y0 = y == 0;
-        let yh = y == self.height - 1;
+        // Relative steps for all 8 directions
+        let offsets = [
+            (-1, -1), (0, -1), (1, -1),
+            (-1,  0),          (1,  0),
+            (-1,  1), (0,  1), (1,  1),
+        ];
 
-        if x != 0 {
-            f(self.grid[idx - 1]);
-            if !y0 {
-                f(self.grid[idx - self.width - 1]);
-            }
-            if !yh {
-                f(self.grid[idx + self.width - 1]);
-            }
-        }
-        if x != self.width - 1 {
-            f(self.grid[idx + 1]);
-            if !y0 {
-                f(self.grid[idx - self.width + 1]);
-            }
-            if !yh {
-                f(self.grid[idx + self.width + 1]);
-            }
-        }
-        if !y0 {
-            f(self.grid[idx - self.width]);
-        }
-        if !yh {
-            f(self.grid[idx + self.width]);
-        }
+        for (dx, dy) in offsets {
+            let nx = x as isize + dx;
+            let ny = y as isize + dy;
 
-        if looping {
-            if x == 0 {
-                //left
-                f(self.grid[idx + self.width - 1]);
-                if y0 {
-                    f(self.grid[self.width * self.height - 1]);
-                } //top left
-                if yh {
-                    f(self.grid[self.width - 1]);
-                } //bottom left
-            }
-            if x == self.width - 1 {
-                //right
-                f(self.grid[idx - self.width - 1]);
-                if y0 {
-                    f(self.grid[self.width * self.height - self.width]);
-                } //top right
-                if yh {
-                    f(self.grid[self.width - 1]);
-                } //top right
-            }
-            if y0 {
-                //top
-                f(self.grid[idx + self.width * (self.height - 1)]);
-            }
-            if yh {
-                //bottom
-                f(self.grid[idx % self.width]);
+            if looping {
+                let tx = ((nx % w as isize + w as isize) % w as isize) as usize;
+                let ty = ((ny % h as isize + h as isize) % h as isize) as usize;
+                f(self.grid[ty * w + tx]);
+            } else {
+                if nx >= 0 && nx < w as isize && ny >= 0 && ny < h as isize {
+                    f(self.grid[ny as usize * w + nx as usize]);
+                }
             }
         }
     }
 }
 
-impl<T: Into<u32> + Default + Copy, E: Default> SimData<T, E> {
+
+impl<E: Default> SimData<E> {
     pub fn new(width: usize, height: usize) -> Self {
         Self {
             width: width,
             height: height,
-            grid: vec![T::default(); width * height],
-            next_grid: vec![T::default(); width * height],
+            grid: vec![0; width * height],
+            next_grid: vec![0; width * height],
 
             extra: E::default(),
         }
@@ -192,8 +152,8 @@ impl<T: Into<u32> + Default + Copy, E: Default> SimData<T, E> {
         Self {
             width: width,
             height: height,
-            grid: vec![T::default(); width * height],
-            next_grid: vec![T::default(); width * height],
+            grid: vec![0; width * height],
+            next_grid: vec![0; width * height],
 
             extra,
         }

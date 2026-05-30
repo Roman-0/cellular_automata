@@ -2,46 +2,50 @@ use std::any::Any;
 
 use minifb::{Window, WindowOptions};
 
-mod sim_behavior;
 mod sim_data;
 mod sim_helper;
 mod simulations;
+mod simulation;
+mod sim_behavior;
 
-use crate::sim_behavior::Simulation;
+use crate::sim_behavior::SimBehavior;
 use crate::sim_data::SimData;
 use crate::sim_helper::*;
-use crate::simulations::base_example::*;
-const WIDTH: usize = 640;
-const HEIGHT: usize = 480;
+use crate::simulations::*;
+use crate::simulation::Simulation;
 
-const TARGET_FPS: usize = 200;
+use crate::fade::fade_simulation;
+use crate::cool1::cool1_simulation;
+use crate::conways::conways_simulation;
+
+
 
 fn main() {
+
+    let mut simulation = conways_simulation(); // Change this to switch between simulations
+
     let mut window = Window::new(
         "Simple Blue Box",
-        WIDTH,
-        HEIGHT,
+        simulation.width,
+        simulation.height,
         WindowOptions {
             resize: true,
-            scale: minifb::Scale::X2,
+            scale: simulation.scale,
             scale_mode: minifb::ScaleMode::AspectRatioStretch,
             ..WindowOptions::default()
         },
     )
     .unwrap();
 
-    let behavior = BehaviorBase;
-    let mut data = SimData::new(WIDTH, HEIGHT);
-    data.set_grids(&init_random_color(WIDTH, HEIGHT));
-    let mut simulation = Simulation::new(behavior, data);
+    simulation.data.set_grids(&init_random_bw(simulation.width, simulation.height));
 
-    window.set_target_fps(TARGET_FPS);
+    window.set_target_fps(simulation.fps);
 
     while window.is_open() && !window.is_key_down(minifb::Key::Escape) {
         simulation.step();
 
         window
-            .update_with_buffer(&simulation.output().as_slice(), WIDTH, HEIGHT)
+            .update_with_buffer(&simulation.output().as_slice(), simulation.width, simulation.height)
             .unwrap();
     }
 }
